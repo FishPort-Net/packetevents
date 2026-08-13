@@ -92,6 +92,7 @@ import org.jspecify.annotations.NullMarked;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -250,6 +251,7 @@ public final class SynchronizedRegistriesHandler {
         // the key to this cache depends on the platform - it may be a constant value for bukkit servers
         // or some backend server related value for proxy servers
         private final Map<Object, SimpleRegistry<T>> syncedRegistries = new ConcurrentHashMap<>(2);
+        private final Set<String> fallbackWarningReasons = ConcurrentHashMap.newKeySet();
 
         public RegistryEntry(
                 IRegistry<T> baseRegistry,
@@ -297,14 +299,22 @@ public final class SynchronizedRegistriesHandler {
             T copiedBaseEntry = baseEntry == null ? null : baseEntry.copy(data);
 
             if (element.getData() != null) {
-                // data was provided, use registry element sent over network
-                T value = this.decoder.decode(element.getData(), wrapper, data);
-                if (!value.deepEquals(copiedBaseEntry)) {
-                    // only define decoded value if it doesn't match the base
-                    // registry value; this ensures we don't save everything twice,
-                    // if it has been already stored in memory
-                    registry.define(elementName, id, value);
-                    return;
+                try {
+                    // data was provided, use registry element sent over network
+                    T value = this.decoder.decode(element.getData(), wrapper, data);
+                    if (!value.deepEquals(copiedBaseEntry)) {
+                        // only define decoded value if it doesn't match the base
+                        // registry value; this ensures we don't save everything twice,
+                        // if it has been already stored in memory
+                        registry.define(elementName, id, value);
+                        return;
+                    }
+                } catch (RuntimeException exception) {
+                    if (this.defineFallback(registry, elementName, id, version, data,
+                            copiedBaseEntry, "failed to decode: " + exception.getMessage())) {
+                        return;
+                    }
+                    throw exception;
                 }
             }
 
@@ -324,10 +334,52 @@ public final class SynchronizedRegistriesHandler {
                 return;
             }
 
+            if (this.defineFallback(registry, elementName, id, version, data,
+                    null, "no definition was sent and no matching base entry exists")) {
+                return;
+            }
+
             // can't find this element anywhere
-            // TODO dummy values to make at least simple stuff work?
             PacketEvents.getAPI().getLogManager().warn("Unknown registry entry "
                     + elementName + " for " + this.getRegistryKey());
+        }
+
+        private boolean defineFallback(
+                SimpleRegistry<T> registry, ResourceLocation elementName, int id,
+                ClientVersion version, TypesBuilderData data,
+                @Nullable T copiedBaseEntry, String reason
+        ) {
+            T fallback = copiedBaseEntry;
+            ResourceLocation fallbackSource;
+            if (fallback == null) {
+                T baseFallback = this.baseRegistry.getById(version, 0);
+                if (baseFallback == null) {
+                    // Not every registry is guaranteed to start at zero. Resolve entries by
+                    // name to ensure the selected fallback exists for this protocol version.
+                    for (T candidate : this.baseRegistry.getEntries()) {
+                        baseFallback = this.baseRegistry.getByName(version, candidate.getName());
+                        if (baseFallback != null) {
+                            break;
+                        }
+                    }
+                }
+                if (baseFallback == null) {
+                    return false;
+                }
+                fallbackSource = baseFallback.getName();
+                fallback = baseFallback.copy(data);
+            } else {
+                fallbackSource = fallback.getName();
+            }
+
+            registry.define(elementName, id, fallback);
+            String warningKey = reason.startsWith("failed to decode:") ? "decode failure" : reason;
+            if (this.fallbackWarningReasons.add(warningKey)) {
+                PacketEvents.getAPI().getLogManager().warn("Using " + fallbackSource
+                        + " as a structural fallback for registry entry " + elementName
+                        + " in " + this.getRegistryKey() + " (" + reason + ")");
+            }
+            return true;
         }
 
         public SimpleRegistry<T> createFromElements(List<RegistryElement> elements, PacketWrapper<?> wrapper) {

@@ -26,6 +26,7 @@ import com.github.retrooper.packetevents.protocol.nbt.NBTCompound;
 import com.github.retrooper.packetevents.protocol.nbt.NBTDouble;
 import com.github.retrooper.packetevents.protocol.nbt.NBTFloat;
 import com.github.retrooper.packetevents.protocol.nbt.NBTInt;
+import com.github.retrooper.packetevents.protocol.nbt.NBTString;
 import com.github.retrooper.packetevents.protocol.particle.Particle;
 import com.github.retrooper.packetevents.protocol.player.ClientVersion;
 import com.github.retrooper.packetevents.protocol.sound.Sound;
@@ -66,7 +67,14 @@ public class BiomeEffects {
                 Color waterColor = compound.getOrThrow("water_color", NbtCodecs.RGB_COLOR, wrapper);
                 Color foliageColor = compound.getOrNull("foliage_color", NbtCodecs.RGB_COLOR, wrapper);
                 Color grassColor = compound.getOrNull("grass_color", NbtCodecs.RGB_COLOR, wrapper);
-                GrassColorModifier grassColorModifier = compound.getOr("grass_color_modifier", GrassColorModifier.CODEC, GrassColorModifier.NONE, wrapper);
+                String grassColorModifierName = compound.getStringTagValueOrDefault(
+                        "grass_color_modifier", GrassColorModifier.NONE.getCodecName());
+                GrassColorModifier grassColorModifier = GrassColorModifier.ID_INDEX.value(grassColorModifierName);
+                if (grassColorModifier == null) {
+                    // Mod loaders may extend the vanilla grass color modifier codec. Keep the
+                    // serialized name so registry NBT can be forwarded without losing data.
+                    grassColorModifier = GrassColorModifier.NONE;
+                }
 
                 Color dryFoliageColor = null;
                 Color fogColor = null;
@@ -127,7 +135,8 @@ public class BiomeEffects {
                 }
 
                 return new BiomeEffects(fogColor, waterColor, waterFogColor, skyColor, foliageColor, dryFoliageColor, grassColor,
-                        grassColorModifier, particle, ambientSound, moodSound, additionsSound, music, musicVolume);
+                        grassColorModifier, grassColorModifierName, particle, ambientSound, moodSound,
+                        additionsSound, music, musicVolume);
             }
 
             @Override
@@ -139,8 +148,8 @@ public class BiomeEffects {
                 if (value.grassColor != null) {
                     compound.set("grass_color", value.grassColor, NbtCodecs.RGB_COLOR, wrapper);
                 }
-                if (value.grassColorModifier != GrassColorModifier.NONE) {
-                    compound.set("grass_color_modifier", value.grassColorModifier, GrassColorModifier.CODEC, wrapper);
+                if (!value.grassColorModifierName.equals(GrassColorModifier.NONE.getCodecName())) {
+                    compound.setTag("grass_color_modifier", new NBTString(value.grassColorModifierName));
                 }
                 if (wrapper.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_21_11)) {
                     if (value.dryFoliageColor != null) {
@@ -199,6 +208,7 @@ public class BiomeEffects {
     private final @Nullable Color dryFoliageColor;
     private final @Nullable Color grassColor;
     private final GrassColorModifier grassColorModifier;
+    private final String grassColorModifierName;
     /**
      * @versions -1.21.10
      */
@@ -283,6 +293,18 @@ public class BiomeEffects {
             @Nullable ParticleSettings particle, @Nullable Sound ambientSound, @Nullable MoodSettings moodSound,
             @Nullable AdditionsSettings additionsSound, RandomWeightedList<MusicSettings> music, float musicVolume
     ) {
+        this(fogColor, waterColor, waterFogColor, skyColor, foliageColor, dryFoliageColor,
+                grassColor, grassColorModifier, grassColorModifier.getCodecName(), particle,
+                ambientSound, moodSound, additionsSound, music, musicVolume);
+    }
+
+    private BiomeEffects(
+            Color fogColor, Color waterColor, Color waterFogColor, Color skyColor, @Nullable Color foliageColor,
+            @Nullable Color dryFoliageColor, @Nullable Color grassColor, GrassColorModifier grassColorModifier,
+            String grassColorModifierName, @Nullable ParticleSettings particle, @Nullable Sound ambientSound,
+            @Nullable MoodSettings moodSound, @Nullable AdditionsSettings additionsSound,
+            RandomWeightedList<MusicSettings> music, float musicVolume
+    ) {
         this.fogColor = fogColor;
         this.waterColor = waterColor;
         this.waterFogColor = waterFogColor;
@@ -291,6 +313,7 @@ public class BiomeEffects {
         this.dryFoliageColor = dryFoliageColor;
         this.grassColor = grassColor;
         this.grassColorModifier = grassColorModifier;
+        this.grassColorModifierName = grassColorModifierName;
         this.particle = particle;
         this.ambientSound = ambientSound;
         this.moodSound = moodSound;
@@ -347,6 +370,15 @@ public class BiomeEffects {
 
     public GrassColorModifier getGrassColorModifier() {
         return this.grassColorModifier;
+    }
+
+    /**
+     * Returns the exact serialized grass color modifier name. This may refer to
+     * a modifier added by a mod loader which isn't represented by
+     * {@link GrassColorModifier}.
+     */
+    public String getGrassColorModifierName() {
+        return this.grassColorModifierName;
     }
 
     /**
