@@ -23,12 +23,14 @@ import com.github.retrooper.packetevents.protocol.nbt.NBTCompound;
 import com.github.retrooper.packetevents.protocol.nbt.NBTNumber;
 import com.github.retrooper.packetevents.protocol.nbt.NBTString;
 import com.github.retrooper.packetevents.protocol.particle.data.ParticleData;
+import com.github.retrooper.packetevents.protocol.particle.data.ParticleNbtData;
 import com.github.retrooper.packetevents.protocol.particle.type.ParticleType;
 import com.github.retrooper.packetevents.protocol.particle.type.ParticleTypes;
 import com.github.retrooper.packetevents.protocol.player.ClientVersion;
 import com.github.retrooper.packetevents.protocol.util.NbtCodec;
 import com.github.retrooper.packetevents.protocol.util.NbtCodecException;
 import com.github.retrooper.packetevents.protocol.util.NbtMapCodec;
+import com.github.retrooper.packetevents.resources.ResourceLocation;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import org.jspecify.annotations.NullMarked;
 
@@ -41,7 +43,16 @@ public class Particle<T extends ParticleData> {
         @Override
         public Particle<?> decode(NBTCompound compound, PacketWrapper<?> wrapper) throws NbtCodecException {
             ClientVersion version = wrapper.getServerVersion().toClientVersion();
-            ParticleType<?> type = compound.getOrThrow("type", ParticleTypes.CODEC, wrapper);
+            NBT typeTag = compound.getTagOrThrow("type");
+            ParticleType<?> type;
+            try {
+                type = ParticleTypes.CODEC.decode(typeTag, wrapper);
+            } catch (NbtCodecException exception) {
+                if (!(typeTag instanceof NBTString)) {
+                    throw exception;
+                }
+                type = new NbtParticleType(new ResourceLocation(((NBTString) typeTag).getValue()));
+            }
             @SuppressWarnings("unchecked")
             ParticleType<? super ParticleData> genericType = (ParticleType<? super ParticleData>) type;
             ParticleData data = type.decodeData(compound, version);
@@ -87,7 +98,14 @@ public class Particle<T extends ParticleData> {
         NBT typeTag = compound.getTagOrThrow("type");
         ParticleType<?> type = typeTag instanceof NBTNumber
                 ? ParticleTypes.getById(version, ((NBTNumber) typeTag).getAsInt())
-                : ParticleTypes.getByName(((NBTString) typeTag).getValue());
+                : ParticleTypes.getRegistry().getByName(version, ((NBTString) typeTag).getValue());
+        if (type == null) {
+            if (!(typeTag instanceof NBTString)) {
+                throw new NbtCodecException("Can't find #" + ((NBTNumber) typeTag).getAsInt()
+                        + " in " + ParticleTypes.getRegistry().getRegistryKey());
+            }
+            type = new NbtParticleType(new ResourceLocation(((NBTString) typeTag).getValue()));
+        }
         ParticleData data = type.decodeData(compound, version);
         return new Particle<>((ParticleType<? super ParticleData>) type, data);
     }
@@ -132,5 +150,70 @@ public class Particle<T extends ParticleData> {
     @Override
     public String toString() {
         return "Particle[" + this.type.getName() + ", " + this.data + ']';
+    }
+
+    private static final class NbtParticleType implements ParticleType<ParticleNbtData> {
+
+        private final ResourceLocation name;
+
+        private NbtParticleType(ResourceLocation name) {
+            this.name = name;
+        }
+
+        @Override
+        public ParticleNbtData readData(PacketWrapper<?> wrapper) {
+            throw this.unsupportedBinaryOperation();
+        }
+
+        @Override
+        public void writeData(PacketWrapper<?> wrapper, ParticleNbtData data) {
+            throw this.unsupportedBinaryOperation();
+        }
+
+        @Override
+        public ParticleNbtData decodeData(NBTCompound compound, ClientVersion version) {
+            return ParticleNbtData.decode(compound, version);
+        }
+
+        @Override
+        public void encodeData(ParticleNbtData value, ClientVersion version, NBTCompound compound) {
+            ParticleNbtData.encode(value, version, compound);
+        }
+
+        @Override
+        public ResourceLocation getName() {
+            return this.name;
+        }
+
+        @Override
+        public int getId(ClientVersion version) {
+            throw this.unsupportedBinaryOperation();
+        }
+
+        @Override
+        public boolean isRegistered() {
+            return false;
+        }
+
+        private UnsupportedOperationException unsupportedBinaryOperation() {
+            return new UnsupportedOperationException("Binary codec is unknown for custom particle " + this.name);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof NbtParticleType)) return false;
+            NbtParticleType that = (NbtParticleType) obj;
+            return this.name.equals(that.name);
+        }
+
+        @Override
+        public int hashCode() {
+            return this.name.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return "NbtParticleType[" + this.name + ']';
+        }
     }
 }
