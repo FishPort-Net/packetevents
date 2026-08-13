@@ -122,8 +122,7 @@ public final class SpigotReflectionUtil {
 
     //Methods
     public static Method IS_DEBUGGING, GET_CRAFT_PLAYER_HANDLE_METHOD, GET_CRAFT_ENTITY_HANDLE_METHOD, GET_CRAFT_WORLD_HANDLE_METHOD,
-            GET_MOB_EFFECT_LIST_ID_METHOD, GET_MOB_EFFECT_LIST_BY_ID_METHOD, GET_ITEM_ID_METHOD, GET_ITEM_BY_ID_METHOD,
-            GET_ITEM_FROM_ITEM_STACK_METHOD,
+            GET_MOB_EFFECT_LIST_ID_METHOD, GET_MOB_EFFECT_LIST_BY_ID_METHOD, GET_ITEM_BY_ID_METHOD,
             GET_BUKKIT_ENTITY_METHOD, GET_LEVEL_ENTITY_GETTER_ITERABLE_METHOD, GET_ENTITY_BY_ID_LEVEL_ENTITY_GETTER_METHOD, GET_ENTITY_BY_ID_METHOD,
             CRAFT_ITEM_STACK_AS_BUKKIT_COPY, CRAFT_ITEM_STACK_AS_NMS_COPY, BUKKIT_PARTICLE_TO_NMS_ENUM_PARTICLE, NMS_ENUM_PARTICLE_TO_BUKKIT_PARTICLE,
             READ_ITEM_STACK_IN_PACKET_DATA_SERIALIZER_METHOD,
@@ -185,9 +184,7 @@ public final class SpigotReflectionUtil {
         GET_CRAFT_WORLD_HANDLE_METHOD = Reflection.getMethod(CRAFT_WORLD_CLASS, "getHandle", 0);
         GET_MOB_EFFECT_LIST_ID_METHOD = Reflection.getMethod(MOB_EFFECT_LIST_CLASS, V_1_19_OR_HIGHER ? "g" : "getId", 0);
         GET_MOB_EFFECT_LIST_BY_ID_METHOD = Reflection.getMethod(MOB_EFFECT_LIST_CLASS, V_1_19_OR_HIGHER ? "a" : "fromId", 0);
-        GET_ITEM_ID_METHOD = Reflection.getMethod(NMS_ITEM_CLASS, V_1_19_OR_HIGHER ? "g" : "getId", 0);
         GET_ITEM_BY_ID_METHOD = Reflection.getMethod(NMS_ITEM_CLASS, NMS_ITEM_CLASS, 0);
-        GET_ITEM_FROM_ITEM_STACK_METHOD = Reflection.getMethod(NMS_ITEM_STACK_CLASS, NMS_ITEM_CLASS, 0);
         if (V_1_17_OR_HIGHER) {
             GET_LEVEL_ENTITY_GETTER_ITERABLE_METHOD = Reflection.getMethod(LEVEL_ENTITY_GETTER_CLASS, Iterable.class, 0);
             GET_ENTITY_BY_ID_LEVEL_ENTITY_GETTER_METHOD = Reflection.getMethod(LEVEL_ENTITY_GETTER_CLASS, ENTITY_ACCESS_CLASS, 0, int.class);
@@ -862,36 +859,17 @@ public final class SpigotReflectionUtil {
     }
 
     public static int getNMSItemId(Object nmsItem) {
-        try {
-            return (int) GET_ITEM_ID_METHOD.invoke(null, nmsItem);
-        } catch (IllegalAccessException | InvocationTargetException e) {
-            e.printStackTrace();
-        }
-        return -1;
+        Object nmsItemStack = createNMSItemStack(nmsItem, 1);
+        return nmsItemStack == null ? -1 : getNMSItemStackId(nmsItemStack);
     }
 
     public static int getNMSItemStackId(Object nmsItemStack) {
-        if (GET_ITEM_FROM_ITEM_STACK_METHOD != null) {
-            try {
-                Object nmsItem = GET_ITEM_FROM_ITEM_STACK_METHOD.invoke(nmsItemStack);
-                int id = getNMSItemId(nmsItem);
-                if (id >= 0) {
-                    return id;
-                }
-            } catch (IllegalAccessException | InvocationTargetException ignored) {
-                // Fall through to the native wire representation below.
-            }
-        }
-
         Object buffer = PooledByteBufAllocator.DEFAULT.buffer();
         try {
             Object serializer = createPacketDataSerializer(buffer);
             writeNMSItemStackPacketDataSerializer(serializer, nmsItemStack);
             PacketWrapper<?> wrapper = PacketWrapper.createUniversalPacketWrapper(buffer);
-            if (VERSION.isNewerThanOrEquals(ServerVersion.V_1_13_2)) {
-                return wrapper.readBoolean() ? wrapper.readVarInt() : 0;
-            }
-            return wrapper.readShort();
+            return SpigotItemRegistry.peekItemStackId(wrapper);
         } finally {
             ByteBufHelper.release(buffer);
         }
@@ -924,7 +902,7 @@ public final class SpigotReflectionUtil {
             writeNMSItemStackPacketDataSerializer(packetDataSerializer, nmsItemStack);
             // No more reflection from here on.
             PacketWrapper<?> wrapper = PacketWrapper.createUniversalPacketWrapper(buffer);
-            SpigotItemRegistry.configureItemStackWrapper(wrapper, in, nmsItemStack);
+            SpigotItemRegistry.configureItemStackWrapper(wrapper, in);
             com.github.retrooper.packetevents.protocol.item.ItemStack stack = wrapper.readItemStack();
             return stack;
         } finally {

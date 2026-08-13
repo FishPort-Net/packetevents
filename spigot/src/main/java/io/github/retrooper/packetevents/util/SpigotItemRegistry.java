@@ -20,6 +20,7 @@ package io.github.retrooper.packetevents.util;
 
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
+import com.github.retrooper.packetevents.netty.buffer.ByteBufHelper;
 import com.github.retrooper.packetevents.protocol.item.type.ItemType;
 import com.github.retrooper.packetevents.protocol.item.type.ItemTypes;
 import com.github.retrooper.packetevents.protocol.item.type.StaticItemType;
@@ -111,7 +112,7 @@ public final class SpigotItemRegistry {
     }
 
     public static void configureItemStackWrapper(
-            PacketWrapper<?> wrapper, ItemStack bukkitStack, Object nmsStack
+            PacketWrapper<?> wrapper, ItemStack bukkitStack
     ) {
         ServerVersion serverVersion = wrapper.getServerVersion();
         if (serverVersion.isOlderThan(ServerVersion.V_1_13_2)
@@ -121,7 +122,10 @@ public final class SpigotItemRegistry {
         }
 
         ClientVersion version = serverVersion.toClientVersion();
-        int id = SpigotReflectionUtil.getNMSItemStackId(nmsStack);
+        int id = peekItemStackId(wrapper);
+        if (id < 0) {
+            throw new IllegalStateException("A non-empty Bukkit ItemStack was serialized as empty");
+        }
         IRegistry<ItemType> registry = runtimeRegistry;
         if (registry != null && registry.getById(version, id) != null) {
             wrapper.setRegistryHolder(RUNTIME_REGISTRY_HOLDER);
@@ -138,6 +142,28 @@ public final class SpigotItemRegistry {
         SimpleRegistry<ItemType> localRegistry = new SimpleRegistry<>(ITEM_REGISTRY_KEY);
         localRegistry.define(name, id, createRuntimeType(name, id, bukkitStack.getType(), baseType));
         wrapper.setRegistryHolder(holderFor(localRegistry));
+    }
+
+    /**
+     * Reads the item ID from the server's native serialization without
+     * consuming any bytes. Hybrid servers may not expose Mojang's static item
+     * ID helper with the same reflection shape as Spigot, while the serialized
+     * ID is the exact value PacketEvents must decode and later write back.
+     */
+    public static int peekItemStackId(PacketWrapper<?> wrapper) {
+        Object buffer = wrapper.getBuffer();
+        int readerIndex = ByteBufHelper.readerIndex(buffer);
+        try {
+            if (wrapper.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_13_2)) {
+                if (!wrapper.readBoolean()) {
+                    return -1;
+                }
+                return wrapper.readVarInt();
+            }
+            return wrapper.readShort();
+        } finally {
+            ByteBufHelper.readerIndex(buffer, readerIndex);
+        }
     }
 
     private static IRegistryHolder holderFor(IRegistry<ItemType> registry) {

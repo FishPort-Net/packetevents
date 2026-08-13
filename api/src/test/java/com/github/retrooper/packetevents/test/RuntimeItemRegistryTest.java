@@ -36,6 +36,7 @@ import com.github.retrooper.packetevents.util.mappings.IRegistryHolder;
 import com.github.retrooper.packetevents.util.mappings.SimpleRegistry;
 import com.github.retrooper.packetevents.util.mappings.SimpleTypesBuilderData;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
+import io.github.retrooper.packetevents.util.SpigotItemRegistry;
 import io.netty.buffer.PooledByteBufAllocator;
 import org.junit.jupiter.api.Test;
 
@@ -94,6 +95,9 @@ public class RuntimeItemRegistryTest extends BaseDummyAPITest {
             inputWriter.writeVarInt(runtimeId);
             inputWriter.writeByte(7);
             inputWriter.writeNBT(nbt);
+
+            assertEquals(runtimeId, SpigotItemRegistry.peekItemStackId(inputWriter));
+            assertEquals(0, ByteBufHelper.readerIndex(input));
 
             ByteBufHelper.readerIndex(input, 0);
             PacketWrapper<?> strictReader = PacketWrapper.createUniversalPacketWrapper(input, ServerVersion.V_1_20_1);
