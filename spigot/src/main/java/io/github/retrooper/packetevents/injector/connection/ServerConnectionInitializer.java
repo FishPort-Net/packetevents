@@ -28,6 +28,7 @@ import com.github.retrooper.packetevents.util.FakeChannelUtil;
 import com.github.retrooper.packetevents.util.PacketEventsImplHelper;
 import io.github.retrooper.packetevents.injector.handlers.PacketEventsDecoder;
 import io.github.retrooper.packetevents.injector.handlers.PacketEventsEncoder;
+import io.github.retrooper.packetevents.util.SpigotItemRegistry;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
@@ -43,6 +44,7 @@ public class ServerConnectionInitializer {
             return;
         }
         User user = new User(channel, connectionState, null, new UserProfile(null, null));
+        SpigotItemRegistry.applyTo(user);
 
         if (connectionState == ConnectionState.PLAY) {
             // Player connected before ViaVersion init, therefore the player is server version (mostly true except 1.7 servers)

@@ -91,6 +91,17 @@ public final class ParticleTypes {
                 new StaticParticleType<>(data, reader, writer, decoder, encoder));
     }
 
+    @ApiStatus.Internal
+    public static <T extends ParticleData> ParticleType<T> define(
+            String name,
+            Reader<T> reader, @Nullable Writer<T> writer,
+            Decoder<T> decoder, WrapperDecoder<T> wrapperDecoder,
+            @Nullable Encoder<T> encoder
+    ) {
+        return REGISTRY.define(name, data ->
+                new StaticParticleType<>(data, reader, writer, decoder, wrapperDecoder, encoder));
+    }
+
     public static @Nullable ParticleType<?> getByName(String name) {
         return REGISTRY.getByName(name);
     }
@@ -193,6 +204,7 @@ public final class ParticleTypes {
             ParticleSpellData::decode, ParticleSpellData::encode);
     public static final ParticleType<ParticleItemStackData> ITEM = define("item",
             ParticleItemStackData::read, ParticleItemStackData::write,
+            (compound, version) -> ParticleItemStackData.decode(compound, version),
             ParticleItemStackData::decode, ParticleItemStackData::encode);
     public static final ParticleType<ParticleVibrationData> VIBRATION = define("vibration",
             ParticleVibrationData::read, ParticleVibrationData::write,
@@ -380,6 +392,13 @@ public final class ParticleTypes {
         }
 
         T decode(NBTCompound compound, ClientVersion version);
+    }
+
+    @ApiStatus.Internal
+    @FunctionalInterface
+    public interface WrapperDecoder<T> {
+
+        T decode(NBTCompound compound, PacketWrapper<?> wrapper);
     }
 
     @ApiStatus.Internal

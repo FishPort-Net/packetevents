@@ -76,7 +76,7 @@ public interface TrimMaterial extends MappedEntity, CopyableEntity<TrimMaterial>
     static TrimMaterial readDirect(PacketWrapper<?> wrapper) {
         String assetName = wrapper.readString();
         ItemType ingredient = wrapper.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_21_5)
-                ? null : wrapper.readMappedEntity(ItemTypes::getById);
+                ? null : wrapper.readMappedEntity(ItemTypes.getRegistry());
         float itemModelIndex = wrapper.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_21_4)
                 ? FALLBACK_ITEM_MODEL_INDEX : wrapper.readFloat();
         Map<ArmorMaterial, String> overrideArmorMaterials = wrapper.readMap(

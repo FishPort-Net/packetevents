@@ -42,7 +42,6 @@ public class Particle<T extends ParticleData> {
     public static final NbtCodec<Particle<?>> CODEC = new NbtMapCodec<Particle<?>>() {
         @Override
         public Particle<?> decode(NBTCompound compound, PacketWrapper<?> wrapper) throws NbtCodecException {
-            ClientVersion version = wrapper.getServerVersion().toClientVersion();
             NBT typeTag = compound.getTagOrThrow("type");
             ParticleType<?> type;
             try {
@@ -55,7 +54,7 @@ public class Particle<T extends ParticleData> {
             }
             @SuppressWarnings("unchecked")
             ParticleType<? super ParticleData> genericType = (ParticleType<? super ParticleData>) type;
-            ParticleData data = type.decodeData(compound, version);
+            ParticleData data = type.decodeData(compound, wrapper);
             return new Particle<>(genericType, data);
         }
 

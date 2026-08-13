@@ -65,7 +65,7 @@ public class MerchantItemCost {
     }
 
     public static MerchantItemCost read(PacketWrapper<?> wrapper) {
-        ItemType item = wrapper.readMappedEntity(ItemTypes::getById);
+        ItemType item = wrapper.readMappedEntity(ItemTypes.getRegistry());
         int count = wrapper.readVarInt();
         ComponentPredicate predicate = ComponentPredicate.read(wrapper);
         return new MerchantItemCost(item, count, predicate);

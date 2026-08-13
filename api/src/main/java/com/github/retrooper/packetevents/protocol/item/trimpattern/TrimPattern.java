@@ -59,7 +59,7 @@ public interface TrimPattern extends MappedEntity, CopyableEntity<TrimPattern>, 
     static TrimPattern readDirect(PacketWrapper<?> wrapper) {
         ResourceLocation assetId = wrapper.readIdentifier();
         ItemType templateItem = wrapper.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_21_5) ? null :
-                wrapper.readMappedEntity(ItemTypes::getById);
+                wrapper.readMappedEntity(ItemTypes.getRegistry());
         Component description = wrapper.readComponent();
         boolean decal = wrapper.readBoolean();
         return new StaticTrimPattern(assetId, templateItem, description, decal);

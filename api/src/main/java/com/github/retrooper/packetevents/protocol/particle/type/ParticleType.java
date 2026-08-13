@@ -35,6 +35,10 @@ public interface ParticleType<T extends ParticleData> extends MappedEntity {
 
     T decodeData(NBTCompound compound, ClientVersion version);
 
+    default T decodeData(NBTCompound compound, PacketWrapper<?> wrapper) {
+        return this.decodeData(compound, wrapper.getServerVersion().toClientVersion());
+    }
+
     void encodeData(T value, ClientVersion version, NBTCompound compound);
 
     @Deprecated

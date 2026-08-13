@@ -32,6 +32,7 @@ public class StaticParticleType<T extends ParticleData> extends AbstractMappedEn
     private final PacketWrapper.Reader<T> reader;
     private final PacketWrapper.Writer<T> writer;
     private final ParticleTypes.Decoder<T> decoder;
+    private final @Nullable ParticleTypes.WrapperDecoder<T> wrapperDecoder;
     private final ParticleTypes.Encoder<T> encoder;
 
     @ApiStatus.Internal
@@ -42,10 +43,23 @@ public class StaticParticleType<T extends ParticleData> extends AbstractMappedEn
             ParticleTypes.Decoder<T> decoder,
             ParticleTypes.Encoder<T> encoder
     ) {
+        this(data, reader, writer, decoder, null, encoder);
+    }
+
+    @ApiStatus.Internal
+    public StaticParticleType(
+            @Nullable TypesBuilderData data,
+            PacketWrapper.Reader<T> reader,
+            PacketWrapper.Writer<T> writer,
+            ParticleTypes.Decoder<T> decoder,
+            @Nullable ParticleTypes.WrapperDecoder<T> wrapperDecoder,
+            ParticleTypes.Encoder<T> encoder
+    ) {
         super(data);
         this.reader = reader;
         this.writer = writer;
         this.decoder = decoder;
+        this.wrapperDecoder = wrapperDecoder;
         this.encoder = encoder;
     }
 
@@ -66,6 +80,13 @@ public class StaticParticleType<T extends ParticleData> extends AbstractMappedEn
     @Override
     public T decodeData(NBTCompound compound, ClientVersion version) {
         return this.decoder.decode(compound, version);
+    }
+
+    @Override
+    public T decodeData(NBTCompound compound, PacketWrapper<?> wrapper) {
+        return this.wrapperDecoder != null
+                ? this.wrapperDecoder.decode(compound, wrapper)
+                : ParticleType.super.decodeData(compound, wrapper);
     }
 
     @Override

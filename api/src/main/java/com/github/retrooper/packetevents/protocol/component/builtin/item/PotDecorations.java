@@ -68,7 +68,7 @@ public class PotDecorations {
     }
 
     private static Optional<ItemType> readItem(PacketWrapper<?> wrapper) {
-        ItemType type = wrapper.readMappedEntity(ItemTypes::getById);
+        ItemType type = wrapper.readMappedEntity(ItemTypes.getRegistry());
         return type == ItemTypes.BRICK ? Optional.empty() : Optional.of(type);
     }
 

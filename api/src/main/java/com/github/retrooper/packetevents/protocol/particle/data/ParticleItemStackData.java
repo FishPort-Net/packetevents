@@ -51,7 +51,8 @@ public class ParticleItemStackData extends ParticleData implements LegacyConvert
             return new ParticleItemStackData(ItemStackSerialization.readTemplate(wrapper));
         } else {
             return new ParticleItemStackData(ItemStack.builder()
-                    .type(ItemTypes.getRegistry().getByIdOrThrow(wrapper.getClientVersion(), wrapper.readVarInt()))
+                    .type(wrapper.replaceRegistry(ItemTypes.getRegistry())
+                            .getByIdOrThrow(wrapper.getClientVersion(), wrapper.readVarInt()))
                     .wrapper(wrapper).build());
         }
     }
@@ -63,6 +64,12 @@ public class ParticleItemStackData extends ParticleData implements LegacyConvert
     public static ParticleItemStackData decode(NBTCompound compound, ClientVersion version) {
         String key = version.isNewerThanOrEquals(ClientVersion.V_1_20_5) ? "item" : "value";
         ItemStack stack = ItemStack.decode(compound.getTagOrThrow(key), version);
+        return new ParticleItemStackData(stack);
+    }
+
+    public static ParticleItemStackData decode(NBTCompound compound, PacketWrapper<?> wrapper) {
+        String key = wrapper.getServerVersion().isNewerThanOrEquals(ServerVersion.V_1_20_5) ? "item" : "value";
+        ItemStack stack = ItemStack.decode(compound.getTagOrThrow(key), wrapper);
         return new ParticleItemStackData(stack);
     }
 

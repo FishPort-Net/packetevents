@@ -108,23 +108,30 @@ public class ItemStack {
     }
 
     public static ItemStack decode(NBT nbt, PacketWrapper<?> wrapper) {
-        return decode(nbt, wrapper.getServerVersion().toClientVersion());
+        return decode(nbt, wrapper.getServerVersion().toClientVersion(), wrapper.getRegistryHolder());
     }
 
     @Deprecated
     public static ItemStack decode(NBT nbt, ClientVersion version) {
+        return decode(nbt, version, GlobalRegistryHolder.INSTANCE);
+    }
+
+    private static ItemStack decode(NBT nbt, ClientVersion version, IRegistryHolder registryHolder) {
         if (nbt instanceof NBTString) {
             ResourceLocation itemName = new ResourceLocation(((NBTString) nbt).getValue());
-            return ItemStack.builder().type(ItemTypes.getByName(itemName.toString())).build();
+            ItemType itemType = registryHolder.getRegistryOr(ItemTypes.getRegistry(), version)
+                    .getByNameOrThrow(version, itemName);
+            return ItemStack.builder().type(itemType).version(version).registryHolder(registryHolder).build();
         }
         NBTCompound compound = (NBTCompound) nbt;
-        ItemStack.Builder builder = ItemStack.builder();
+        ItemStack.Builder builder = ItemStack.builder().version(version).registryHolder(registryHolder);
 
         ResourceLocation itemName = Optional.ofNullable(compound.getStringTagValueOrNull("id")).map(Optional::of)
                 .orElseGet(() -> Optional.ofNullable(compound.getStringTagValueOrNull("item")))
                 .map(ResourceLocation::new).orElseThrow(() -> new IllegalArgumentException(
                         "No item type specified: " + compound.getTags().keySet()));
-        builder.type(ItemTypes.getByName(itemName.toString()));
+        builder.type(registryHolder.getRegistryOr(ItemTypes.getRegistry(), version)
+                .getByNameOrThrow(version, itemName));
         builder.nbt(compound.getCompoundTagOrNull("tag"));
 
         Optional.ofNullable(compound.getNumberTagOrNull("Count")).map(Optional::of)

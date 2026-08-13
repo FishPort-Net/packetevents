@@ -118,7 +118,7 @@ public final class ItemStackSerialization {
         }
 
         ClientVersion version = wrapper.getServerVersion().toClientVersion();
-        ItemType type = ItemTypes.getRegistry().getByIdOrThrow(version, typeId);
+        ItemType type = wrapper.replaceRegistry(ItemTypes.getRegistry()).getByIdOrThrow(version, typeId);
         int amount = wrapper.readByte();
         int legacyData = version.isOlderThan(ClientVersion.V_1_13) ? wrapper.readShort() : -1;
         NBTCompound nbt = wrapper.readNBT();
